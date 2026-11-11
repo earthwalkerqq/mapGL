@@ -1,0 +1,61 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(test_map VERSION 0.1 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(Qt6 REQUIRED COMPONENTS
+    Quick
+    Core
+    Sql
+    Concurrent
+)
+
+add_library(orm INTERFACE)
+target_include_directories(orm INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/orm
+    ${CMAKE_CURRENT_SOURCE_DIR}/orm/lib
+)
+target_link_libraries(orm INTERFACE Qt6::Core Qt6::Sql)
+
+qt_standard_project_setup(REQUIRES 6.8)
+
+qt_add_executable(apptest_map
+    main.cpp
+)
+
+qt_add_qml_module(apptest_map
+    URI test_map
+    QML_FILES
+        Main.qml
+        SOURCES sgmapview.h sgmapview.cpp
+        SOURCES cameraview.h cameraview.cpp
+        SOURCES mapGL.h
+        SOURCES tileprovider.h
+        SOURCES networktileprovider.h networktileprovider.cpp
+)
+
+# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
+# If you are developing for iOS or macOS you should consider setting an
+# explicit, fixed bundle identifier manually though.
+set_target_properties(apptest_map PROPERTIES
+#    MACOSX_BUNDLE_GUI_IDENTIFIER com.example.apptest_map
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    MACOSX_BUNDLE TRUE
+    WIN32_EXECUTABLE TRUE
+)
+
+target_link_libraries(apptest_map
+    PRIVATE Qt6::Quick
+    PRIVATE Qt6::Core
+    PRIVATE Qt6::Concurrent
+    PRIVATE orm
+)
+
+include(GNUInstallDirs)
+install(TARGETS apptest_map
+    BUNDLE DESTINATION .
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
