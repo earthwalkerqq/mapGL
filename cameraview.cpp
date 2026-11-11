@@ -82,9 +82,9 @@ QTransform CameraView::worldToScreen() const
     return QTransform(ws, 0, 0, ws, m_w / 2 - m_cx * ws, m_h / 2 - m_cy * ws);
 }
 
-std::vector<VisibleTile> CameraView::visibleTiles(int minTileZoom, int maxTileZoom) const
+QVector<VisibleTile> CameraView::visibleTiles(int minTileZoom, int maxTileZoom) const
 {
-    std::vector<VisibleTile> out;
+    QVector<VisibleTile> out;
     if (int(std::lround(m_zoom)) < minTileZoom)
         return out;                  // мельче, чем есть данные у источника
     const int tz = tileZoom(minTileZoom, maxTileZoom);

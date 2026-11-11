@@ -67,12 +67,12 @@ public:
     double centerLon() const;
     void zoomAround(double newZoom, double sx, double sy);
     // вектор отсортированных по приоритету видимых тайлов
-    std::vector<VisibleTile> visibleTiles() const { return visibleTiles(0, kMaxTileZoom); }
+    QVector<VisibleTile> visibleTiles() const { return visibleTiles(0, kMaxTileZoom); }
     /*
      * то же со своим диапазоном зумов тайлов (векторные аэродромы — z8..z16):
      * если зум камеры меньше minTileZoom — пусто, больше maxTileZoom — тайлы maxTileZoom
      */
-    std::vector<VisibleTile> visibleTiles(int minTileZoom, int maxTileZoom) const;
+    QVector<VisibleTile> visibleTiles(int minTileZoom, int maxTileZoom) const;
     // нормализованные координаты мира 0..1 -> пиксели экрана
     QTransform worldToScreen() const;
 signals:

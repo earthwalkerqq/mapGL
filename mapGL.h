@@ -14,8 +14,12 @@ inline void debug(const QString msg = QString()) { qDebug() << debugLogPrefix <<
 inline void warning(const QString msg = QString()) { qDebug() << errorLogPrefix << msg; }
 
 // test
+// network
 const QString k_server_url = QStringLiteral("http://172.20.10.2:8080");
 const QString k_tile_req_postfix = QStringLiteral("/tiles");
+// local fallback
+const QString k_fallback_path =
+    QStringLiteral("/Users/husen/Documents/test_map/materials/map/world_raster_z0_z6.mbtiles");
 
 namespace math {
 
