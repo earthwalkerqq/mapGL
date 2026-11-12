@@ -1,52 +1,38 @@
 #ifndef TILEMANAGER_H
 #define TILEMANAGER_H
 
+/*
+ * связывает камеру, планировщик загрузки и рисование.
+ */
+
 #include "sgmapview.h"
+#include "tilestore.h"
 #include "tilescheduler.h"
+
+#include <memory>
 
 class TileManager : public SGMapView
 {
     Q_OBJECT
+    QML_ELEMENT
 public:
-    explicit TileManager(QQuickItem *parent = nullptr)
-        : SGMapView(parent)
-    {
-        m_scheduler = TileScheduler::instance();
-        // TODO: Добавить сеть и подложку
-        m_scheduler->addSource(std::make_shared<TileProvider>());
-        m_scheduler->addSource(std::make_shared<TileProvider>());
-        connect();
-    }
+    explicit TileManager(QQuickItem *parent = nullptr);
+    ~TileManager() override;
 
 protected:
-    void onCameraChanged() override
-    {
-        if (!m_camera) return;
-        const QVector<VisibleTile> visible = m_camera->visibleTiles();
-
-        std::vector<uint64_t> keys;
-
-        for (const VisibleTile &t : visible)
-            keys.push_back(TileCore::makeKey(t.z, t.x, t.y));
-
-        for (const VisibleTile &t : visible) {
-            if (t.z <= m_BaseMaxZoom)
-                continue;
-            const int up = t.z - m_BaseMaxZoom;
-            const uint64_t base = TileCore::makeKey(m_BaseMaxZoom, t.x >> up, t.y >> up);
-            if (std::find(keys.begin(), keys.end(), base) == keys.end())
-                keys.push_back(base);
-        }
-
-        m_tiles.load_tiles(keys);
-        update();
-    }
-
-    // рисует MapLayer текстурами; здесь — только откуда брать картинку тайла
-    const QImage *tileImage(uint64_t key) const override { return m_tiles.getImage(key); }
+    void onCameraChanged() override;
+    bool tileImage(uint64_t key, QImage *img, quint32 *version) const override;
 
 private:
-    TileScheduler *m_scheduler;
+    // пересчитать набор нужных тайлов (не чаще раза за проход цикла событий)
+    void reloadTiles();
+
+    // планировщик позже хранилища - удалиться раньше
+    TileStore m_store;
+    std::unique_ptr<TileScheduler> m_scheduler;
+
+    QVector<uint64_t> m_lastKeys;
+    bool m_reloadPending = false;
 };
 
 #endif // TILEMANAGER_H

@@ -16,32 +16,16 @@ class QSGSimpleTextureNode;
 class QSGTexture;
 
 /*
- * Базовый класс тайлового слоя карты на графе сцены (scene graph).
+ * Базовый класс тайлового слоя карты на sg
  *
- * Слой только рисует себя по камере. Камеру он не создаёт и не двигает:
- * её создаёт MapView, он же обрабатывает мышь. Слой подписан на сигнал
- * камеры cameraChanged() и по нему перерисовывается.
+ * Слой подписан на сигнал камеры cameraChanged()
+ * и по нему перерисовывается.
  *
- * Как рисует. Каждая картинка тайла один раз загружается в видеокарту
- * текстурой (QSGTexture) и дальше живёт там, в кэше слоя. На каждый кадр
- * меняются только прямоугольники узлов: при перетаскивании ничего
- * не перерисовывается на процессоре и не загружается заново.
+ * Каждая картинка тайла один раз загружается в видеокарту
+ * текстурой (QSGTexture) и дальше живёт там, в кэше слоя
  *
- *   корневой узел
- *    ├─ QSGSimpleRectNode       фон (если задан)
- *    ├─ QSGNode                 тайлы:
- *    │   └─ QSGSimpleTextureNode × N  по одному на видимый тайл; если своей картинки
- *    │                                ещё нет — часть картинки предка (sourceRect)
- *    └─ (узлы наследника)       наследник может дописать свои узлы поверх тайлов
- *                               (подписи): вызвать MapLayer::updatePaintNode и
- *                               добавить детей в возвращённый корень
- *
- * Наследнику достаточно отдать картинку тайла по ключу — tileImage().
- * Если картинки под теми же ключами поменялись (другой аэродром) — invalidateTiles().
- *
- * Потоки. updatePaintNode() вызывается в потоке рендера, пока основной поток
- * остановлен: читать данные слоя и менеджера там безопасно, а всё, что связано
- * с QSG*, трогать можно только там.
+ * Все что связано с QSG* безопасно трогать только в потоке
+ * рендера
  */
 class SGMapView : public QQuickItem
 {
@@ -58,8 +42,10 @@ public:
         if (m_camera == c) return;
         if (m_camera) disconnect(m_camera, nullptr, this, nullptr);
         m_camera = c;
-        if (m_camera)
+        if (m_camera) {
             connect(m_camera, &CameraView::cameraChanged, this, &SGMapView::onCameraChanged);
+            m_camera->setViewport(width(), height());
+        }
         emit cameraObjectChanged();
         onCameraChanged();
     }
@@ -76,20 +62,15 @@ protected:
     // слой уходит из окна: текстуры удалить в потоке рендера
     void releaseResources() override;
     void itemChange(ItemChange change, const ItemChangeData &value) override;
+    // размер элемента поменялся — сообщить камере размер экрана
+    void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
 
-    /*
-     * @details
-     * камера сдвинулась: по умолчанию перерисоваться,
-     * для производных - запрос тайлов из сети/кэша/mbtiles
-     */
+    // камера сдвинулась - по умолчанию перерисоваться
     virtual void onCameraChanged() { update(); }
     // какие тайлы показать; по умолчанию — растровые уровни камеры (z0..kMaxTileZoom)
-    virtual std::vector<VisibleTile> tilesToShow() const { return m_camera->visibleTiles(); }
-    /*
-     * картинка тайла по ключу или nullptr, если её ещё нет;
-     * вызывается из updatePaintNode — в потоке рендера при остановленном основном
-     */
-    virtual const QImage *tileImage(uint64_t key) const = 0;
+    virtual QVector<VisibleTile> tilesToShow() const { return m_camera->visibleTiles(); }
+    // картинка тайла по ключу; false — её ещё нет.
+    virtual bool tileImage(uint64_t key, QImage *img, quint32 *version) const = 0;
 
     void setBackgroundColor(const QColor &c) { m_background = c; update(); }
     // картинки тайлов поменялись: на следующем кадре удалить все текстуры и создать заново
@@ -99,11 +80,8 @@ protected:
 
 private:
     /*
-     * @brief
-     *  Нахождение текстуры для конкретного ключа
-     * @details
-     *  Сперва пытается найти ключ в кэше, а зетем
-     *  вызывает tileImage
+     * Сперва пытается найти ключ в кэше, а зетем
+     * вызывает tileImage
      */
     QSGTexture *textureFor(uint64_t key);
     // кэш текстур больше лимита — удалить давно не показанные
@@ -125,6 +103,7 @@ private:
         QSGTexture *texture = nullptr;
         quint64 lastFrame = 0;          // в каком кадре показывалась — для LRU
         qint64 bytes = 0;               // ширина × высота × 4
+        quint32 version = 0;            // версия картинки, из которой сделана текстура
     };
 
     /*
@@ -132,6 +111,12 @@ private:
      * растровый тайл 256×256 — 256 КБ, тайл аэродрома 512×512 — 1 МБ.
      */
     static constexpr qint64 kMaxTextureBytes = 48LL * 1024 * 1024;
+    /*
+     * Сколько текстур загружать в видеопамять за один кадр. Если разом пришло
+     * 40 тайлов, 40 загрузок в одном кадре дадут рывок; остальные догрузятся
+     * в следующих кадрах, а пока на их месте — кусок предка.
+     */
+    static constexpr int kMaxUploadsPerFrame = 8;
 
     // всё ниже — только из потока рендера
     QHash<uint64_t, CachedTexture> m_textures;
@@ -141,6 +126,8 @@ private:
     QSGSimpleRectNode *m_backgroundNode = nullptr;
     // текущий кадр, на нем строится lru - самый старый кадр удалиться первым
     quint64 m_frame = 0;
+    int m_uploadsThisFrame = 0;
+    bool m_needMoreUploads = false;     // не всё загрузили — попросить ещё кадр
 
     QColor m_background = Qt::transparent;
     bool m_dropTextures = false;        // ставится в основном потоке, читается в sync (основной стоит)

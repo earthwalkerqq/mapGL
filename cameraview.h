@@ -53,19 +53,19 @@ public:
      * Получение центра экрана по долготе и широте
      * по проекции Web Mercator
      */
-    void setCenterLatLon(double lat, double lon);
-    void setZoom(double z);
+    Q_INVOKABLE void setCenterLatLon(double lat, double lon);
+    Q_INVOKABLE void setZoom(double z);
     /*
      * @brief сдвиг камеры в пикселях экрана
      * @details по широте есть ограничения на полюсах
      * а по долготе мир замнут [0; 1)
      */
-    void panBy(double dx, double dy);
+    Q_INVOKABLE void panBy(double dx, double dy);
     double getZoom() const { return m_zoom; }
     // центр камеры в градусах (обратная проекция Web Mercator)
     double centerLat() const;
     double centerLon() const;
-    void zoomAround(double newZoom, double sx, double sy);
+    Q_INVOKABLE void zoomAround(double newZoom, double sx, double sy);
     // вектор отсортированных по приоритету видимых тайлов
     QVector<VisibleTile> visibleTiles() const { return visibleTiles(0, kMaxTileZoom); }
     /*

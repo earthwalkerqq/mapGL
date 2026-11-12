@@ -9,6 +9,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Core
     Sql
     Concurrent
+    Network
 )
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
@@ -35,8 +36,13 @@ qt_add_qml_module(apptest_map
         SOURCES tileprovider.h
         SOURCES networktileprovider.h networktileprovider.cpp
         SOURCES fallbacktileprovider.h fallbacktileprovider.cpp
+        SOURCES tilestore.h
+        SOURCES tileformat.h
+        SOURCES tiledecoder.h tiledecoder.cpp
         SOURCES tilescheduler.h tilescheduler.cpp
         SOURCES tilemanager.h tilemanager.cpp
+        SOURCES tileloader.h tileloader.cpp
+        SOURCES tileservermeta.h
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -54,6 +60,7 @@ target_link_libraries(apptest_map
     PRIVATE Qt6::Quick
     PRIVATE Qt6::Core
     PRIVATE Qt6::Concurrent
+    PRIVATE Qt6::Network
     PRIVATE orm
 )
 target_link_libraries(apptest_map PRIVATE Qt6::Core)

@@ -2,54 +2,60 @@
 #define TILESCHEDULER_H
 
 /*
- * Планировщик задач
+ * Планировщик задач загрузки
  */
 
-#include <QObject>
-#include <QCoreApplication>
-#include <QCache>
-
+#include "tiledecoder.h"
 #include "tileprovider.h"
+#include "tilestore.h"
 #include "mapGL.h"
+
+#include <QHash>
+#include <QObject>
+#include <QVector>
+
+class QThread;
 
 class TileScheduler : public QObject
 {
     Q_OBJECT
 public:
-    static TileScheduler *instance()
-    {
-        static TileScheduler *self = nullptr;
-        if (!self)
-            self = new TileScheduler(QCoreApplication::instance());
-        return self;
-    }
+    explicit TileScheduler(TileStore *store, QObject *parent = nullptr);
+    ~TileScheduler() override;
 
     TileScheduler(const TileScheduler&) = delete;
     TileScheduler& operator=(const TileScheduler&) = delete;
-    TileScheduler(TileScheduler&&) = delete;
-    TileScheduler& operator=(TileScheduler&&) = delete;
 
-    void addSource(std::shared_ptr<TileProvider> src) {
-        m_source.push_back(std::move(src));
-    }
+    void addSource(TileProvider *src);
+    void removeSource(mapGL::TileQuality quality);
 
-    void removeSource(mapGL::TileQuality quality) {
-        m_source.erase(std::remove_if(m_source.begin(), m_source.end(),
-            [quality](std::shared_ptr<TileProvider> src) {
-                return quality == src->quality();
-            }), m_source.end());
-    }
-
-    void asyncTileLoad();
+    void setVisibleTiles(const QVector<uint64_t> &keys);
 
 signals:
-    void readyTile(mapGL::TileMeta rs);
+    // в TileStore появились новые картинки — пора перерисоваться
+    void tilesChanged(void);
 
 private:
-    explicit TileScheduler(QObject *parent);
+    struct Source
+    {
+        TileProvider *provider = nullptr;
+        QThread *thread = nullptr; // nullptr — провайдер живёт в главном потоке
+    };
 
-    QVector<std::shared_ptr<TileProvider>> m_source;
-    QCache<uint64_t, QByteArray> m_cache;
+    void requestLoad(const Source &src, const QVector<uint64_t> &keys, quint64 generation);
+    void destroySource(const Source &src);
+
+    void onRawTile(const mapGL::TileMeta &tile);
+    void onDecoded(uint64_t key, const QImage &img, mapGL::TileQuality quality);
+    void onFailedTile(uint64_t key, const QString &msg);
+
+    TileStore *m_store;
+    TileDecoder m_decoder;
+    QVector<Source> m_source;
+    // ключи, которые сейчас декодируются, и с каким качеством — чтобы не декодировать дважды
+    QHash<uint64_t, mapGL::TileQuality> m_decoding;
+    QVector<uint64_t> m_visible;
+    quint64 m_generation = 0;
 };
 
 #endif // TILESCHEDULER_H

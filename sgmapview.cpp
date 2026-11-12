@@ -12,7 +12,7 @@
 
 namespace {
 
-// удалить текстуры в потоке рендера (из releaseResources напрямую нельзя)
+// удалить текстуры в потоке рендера
 class TextureCleanupJob : public QRunnable
 {
 public:
@@ -28,7 +28,6 @@ private:
 SGMapView::SGMapView(QQuickItem *parent)
     : QQuickItem(parent)
 {
-    // данный визуальный элемент имеет
     // собственное графическое содержимое для отрисовки
     setFlag(ItemHasContents, true);
 }
@@ -47,26 +46,10 @@ void SGMapView::itemChange(ItemChange change, const ItemChangeData &value)
     QQuickItem::itemChange(change, value);
 }
 
-// очистка текстур через TextureCleanupJob в render thread
 void SGMapView::dropTextures()
 {
-    if (m_textures.isEmpty())
-        return;
-
-    QList<QSGTexture *> texturesToDelete;
-    for (const CachedTexture &c : m_textures) {
-        if (c.texture) {
-            texturesToDelete.append(c.texture);
-        }
-    }
-
-    if (!texturesToDelete.isEmpty() && window()) {
-        window()->scheduleRenderJob(
-            new TextureCleanupJob(texturesToDelete),
-            QQuickWindow::BeforeSynchronizingStage
-        );
-    }
-
+    for (const CachedTexture &c : std::as_const(m_textures))
+        delete c.texture;
     m_textures.clear();
     m_textureBytes = 0;
 }
@@ -98,15 +81,37 @@ void SGMapView::releaseResources()
 
 QSGTexture *SGMapView::textureFor(uint64_t key)
 {
+    quint32 version = 0;
+    const bool inStore = tileImage(key, nullptr, &version);
+    const bool budgetLeft = m_uploadsThisFrame < kMaxUploadsPerFrame;
+
     const auto it = m_textures.find(key);
     if (it != m_textures.end()) {
-        it->lastFrame = m_frame;
-        return it->texture;
+        /*
+         * Текстура актуальна — отдаём. Если картинку уже вытеснили из ОЗУ
+         * (!inStore) — тоже отдаём, что есть. Если пришла новая версия, а
+         * лимит загрузок исчерпан — пока показываем старую.
+         */
+        const bool outdated = inStore && it->version != version;
+        if (!outdated || !budgetLeft) {
+            if (outdated)
+                m_needMoreUploads = true;
+            it->lastFrame = m_frame;
+            return it->texture;
+        }
     }
 
-    const QImage *img = tileImage(key);
-    if (!img || img->isNull() || !window())
+    if (!inStore || !window())
         return nullptr;
+    if (!budgetLeft) {
+        m_needMoreUploads = true;   // покажем предка, догрузим в следующем кадре
+        return nullptr;
+    }
+
+    QImage image;
+    if (!tileImage(key, &image, &version) || image.isNull())
+        return nullptr;
+    const QImage *img = &image;
 
     /*
      * Без TextureHasAlphaChannel текстура считается непрозрачной и рисуется без
@@ -120,8 +125,23 @@ QSGTexture *SGMapView::textureFor(uint64_t key)
     if (!tex)
         return nullptr;
     tex->setFiltering(QSGTexture::Linear);
+    ++m_uploadsThisFrame;
     const qint64 bytes = qint64(img->width()) * img->height() * 4;
-    m_textures.insert(key, CachedTexture{tex, m_frame, bytes});
+
+    if (it != m_textures.end()) {
+        /*
+         * Старая версия: удаляем сразу. Безопасно — мы в sync-фазе, кадр сейчас
+         * не рисуется, а все узлы ниже в этом же кадре получат текстуры заново.
+         * В этом кадре старую текстуру никто не получил: версии в хранилище
+         * во время sync не меняются (главный поток стоит), значит при более
+         * раннем обращении она тоже была бы признана устаревшей.
+         */
+        delete it->texture;
+        m_textureBytes -= it->bytes;
+        *it = CachedTexture{tex, m_frame, bytes, version};
+    } else {
+        m_textures.insert(key, CachedTexture{tex, m_frame, bytes, version});
+    }
     m_textureBytes += bytes;
     return tex;
 }
@@ -181,6 +201,8 @@ QSGNode *SGMapView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
     }
 
     ++m_frame;
+    m_uploadsThisFrame = 0;
+    m_needMoreUploads = false;
 
     // что показать: для каждого видимого тайла — своя текстура или часть текстуры предка
     struct Piece
@@ -251,5 +273,21 @@ QSGNode *SGMapView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
 
     // Очистить старые текстуры (которые не используются)
     evictTextures();
+
+    /*
+     * Не всё успели загрузить в видеопамять — попросить следующий кадр.
+     * update() — метод главного потока, поэтому через очередь событий
+     * (мы сейчас в потоке рендера).
+     */
+    if (m_needMoreUploads)
+        QMetaObject::invokeMethod(this, [this]() { update(); }, Qt::QueuedConnection);
+
     return root;
+}
+
+void SGMapView::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
+{
+    QQuickItem::geometryChange(newGeometry, oldGeometry);
+    if (m_camera && newGeometry.size() != oldGeometry.size())
+        m_camera->setViewport(newGeometry.width(), newGeometry.height());
 }

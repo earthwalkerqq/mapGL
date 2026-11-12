@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <QString>
 #include <QDebug>
+#include <QImage>
 
 namespace mapGL {
 
@@ -15,10 +16,11 @@ inline void warning(const QString msg = QString()) { qDebug() << errorLogPrefix 
 
 // test
 // network
-const QString k_server_url = QStringLiteral("http://172.20.10.2:8080");
+const QString k_serv_target= QStringLiteral("http://172.20.10.2:8080");
 const QString k_tile_req_postfix = QStringLiteral("/tiles");
+const QString k_tile_fetch_postfix = QStringLiteral("/tiles/piramid");
 // local fallback
-const QString k_fallback_path =
+const QString k_fallback_target =
     QStringLiteral("/Users/husen/Documents/test_map/materials/map/world_raster_z0_z6.mbtiles");
 
 namespace math {
@@ -45,11 +47,37 @@ enum class TileQuality {
     Custom   = 10 // на будущее (векторные аэродромы и тд)
 };
 
-struct TileMeta {
-    uint64_t key;
+// сырые байты тайла от провайдера — ещё не декодированы
+struct RawTile {
     QByteArray data;
     TileQuality quality;
+    QByteArray format; // имя плагина Qt ("png", "jpg"), см. tileformat.h; пусто — определить по содержимому
 };
+
+// декодированный тайл — лежит в TileStore
+struct DataTile {
+    QImage img;
+    TileQuality quality;
+};
+
+struct TileMeta {
+    uint64_t key;
+    RawTile rwTile;
+};
+
+enum class DataUnit : uint32_t {
+    Byte = 1ULL,
+    KB   = 1024ULL,
+    MB   = 1024ULL * 1024ULL,
+    GB   = 1024ULL * 1024ULL * 1024ULL
+};
+
+inline uint64_t convertToBytes(double value, DataUnit unit) {
+    if (value < 0) {
+        return 0;
+    }
+    return static_cast<uint64_t>(value * static_cast<uint64_t>(unit));
+}
 
 } // namespace mapGL
 

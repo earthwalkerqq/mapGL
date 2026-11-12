@@ -2,48 +2,78 @@
 #define TILEPROVIDER_H
 
 /*
- * абсрактный класс с общим интерфейсом
- * взятия тайлов из неопределенного источника
+ * Абстрактный источник тайлов.
+ *
+ * Провайдер умеет одно: по ключам достать СЫРЫЕ байты и отдать их сигналом
+ * readyTile(). Он не декодирует (это TileDecoder), не хранит готовые
+ * картинки (это TileStore) и не знает про камеру (ключи ему передаёт
+ * TileScheduler).
+ *
+ * Потоки. Провайдер живёт либо в своём потоке (needsOwnThread() == true,
+ * например SQLite — блокирующие вызовы), либо в главном (сеть: QNetworkAccessManager
+ * и так асинхронный). Всё, что нужно потоку, создаётся в init() — он
+ * вызывается уже в потоке провайдера.
+ *
+ * Поколение (generation). Каждый новый набор видимых тайлов получает номер.
+ * Планировщик сразу (атомарно, из главного потока) сообщает провайдеру
+ * последний номер, а задания load() приходят в очередь. Если камера
+ * успела уехать, устаревший load() увидит isStale() и выйдет — очередь
+ * не копится, работа на ненужные тайлы не тратится.
  */
 
 #include "mapGL.h"
+#include "tilestore.h"
+
 #include <QObject>
-#include <QReadWriteLock>
+#include <QVector>
+#include <atomic>
 
 class TileProvider : public QObject
 {
     Q_OBJECT
 
 public:
-    TileProvider(QObject *parent = nullptr)
-        : QObject(parent) {}
+    explicit TileProvider(QObject *parent = nullptr) : QObject(parent) {}
+    ~TileProvider() override = default;
 
-    virtual void load(void) = 0;
-    virtual mapGL::TileQuality quality(void);
+    virtual mapGL::TileQuality quality(void) const = 0;
+    // нужен ли провайдеру собственный поток (блокирующий ввод-вывод)
+    virtual bool needsOwnThread(void) const { return false; }
 
-    static void setVisibleTiles(QVector<uint64_t> &&keys)
+    // вызывается один раз, уже в потоке провайдера
+    virtual void init(void) {}
+    /*
+     * keys — видимые тайлы, отсортированы по приоритету (ближе к центру — раньше),
+     * без повторов. Вызывается в потоке провайдера.
+     */
+    virtual void load(const QVector<uint64_t> &keys, quint64 generation) = 0;
+
+    // ---- вызываются из главного потока (TileScheduler) ----
+    void setStore(const TileStore *store) { m_store = store; }
+    void setLatestGeneration(quint64 generation)
     {
-        QWriteLocker locker(&m_lock);
-        m_visibleTile = std::move(keys);
-    }
-
-    static QVector<uint64_t> getVisibleTiles() {
-        QReadLocker locker(&m_lock);
-        return m_visibleTile;
+        m_latestGeneration.store(generation, std::memory_order_relaxed);
     }
 
 signals:
-    void readyTile(mapGL::TileMeta rs);
-    void failedTile(uint64_t key, const QString msgError);
+    void readyTile(const mapGL::TileMeta &tile);
+    void failedTile(uint64_t key, const QString &msgError);
 
 protected:
-    /*
-     * TODO:
-     * как то надо использовать пулл тайлов,
-     * которые нужно загрузить
-     */
-    static QVector<uint64_t> m_visibleTile;
-    static QReadWriteLock m_lock;
+    // камера уже уехала
+    bool isStale(quint64 generation) const
+    {
+        return generation != m_latestGeneration.load(std::memory_order_relaxed);
+    }
+    // тайл такого же или лучшего качества уже готов — повторно не грузим
+    bool alreadyHave(uint64_t key) const
+    {
+        return m_store && m_store->has(key, quality());
+    }
+
+private:
+    const TileStore *m_store = nullptr;
+    std::atomic<quint64> m_latestGeneration{0};
 };
 
 #endif // TILEPROVIDER_H
