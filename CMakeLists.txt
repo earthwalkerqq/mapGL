@@ -42,7 +42,9 @@ qt_add_qml_module(apptest_map
         SOURCES tilescheduler.h tilescheduler.cpp
         SOURCES tilemanager.h tilemanager.cpp
         SOURCES tileloader.h tileloader.cpp
-        SOURCES tileservermeta.h
+        SOURCES servermeta.h
+        SOURCES standartsourcepath.h
+        SOURCES network.h
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -55,6 +57,17 @@ set_target_properties(apptest_map PROPERTIES
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
+
+# локальная сборка
+target_compile_definitions(apptest_map
+    PRIVATE MAPGL_DATA_DIR="/Users/husen/Documents/test_map"
+    PRIVATE MAPGL_SOURCE_DIR="/Users/husen/Documents/test_map"
+)
+
+# для сборки на деплой
+# target_compile_definitions(apptest_map
+#     PRIVATE MAPGL_AURORA
+# )
 
 target_link_libraries(apptest_map
     PRIVATE Qt6::Quick

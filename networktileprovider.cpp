@@ -1,4 +1,5 @@
 #include "networktileprovider.h"
+#include "servermeta.h"
 #include "mapGL.h"
 #include "tileformat.h"
 
@@ -6,17 +7,8 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 
-static inline QString getReqUrlTarget(int z, int x, int y)
-{
-    QString postfix = QStringLiteral("%1/%2/%3/%4")
-        .arg(mapGL::k_tile_req_postfix).arg(z).arg(x).arg(y);
-
-    return postfix;
-}
-
 NetworkTileProvider::NetworkTileProvider(QObject *parent)
-    : TileProvider{parent},
-    TileServerMeta(new QNetworkAccessManager(this)) {}
+    : TileProvider{parent} {}
 
 NetworkTileProvider::~NetworkTileProvider()
 {
@@ -68,35 +60,13 @@ void NetworkTileProvider::load(const QVector<uint64_t> &keys, quint64 generation
 
 void NetworkTileProvider::processQueue()
 {
-    while (m_inFlight.size() < k_max_requested_tile && !m_queue.isEmpty()) {
+    while (m_inFlight.size() < mapGL::server::k_max_requested_tile && !m_queue.isEmpty()) {
         const uint64_t key = m_queue.takeFirst();
         if (m_inFlight.contains(key) || m_missing.contains(key) || alreadyHave(key)) {
             continue;
         }
-        sendRequest(key);
+        sendReqForGetTile(key);
     }
-}
-
-void NetworkTileProvider::sendRequest(uint64_t key)
-{
-    uint8_t z;
-    uint32_t x, y;
-    mapGL::math::parseKey(key, &z, &x, &y);
-
-    const QString reqPostfix = getReqUrlTarget(static_cast<int>(z), static_cast<int>(x), static_cast<int>(y));
-    const QUrl requestUrl = m_serv_target.resolved(QUrl(reqPostfix));
-
-    mapGL::debug(QStringLiteral("GET - %1").arg(requestUrl.toString()));
-
-    QNetworkRequest request(requestUrl);
-    // без таймаута на плохой сети слот может висеть минутами
-    request.setTransferTimeout(k_transfer_timeout_ms);
-
-    QNetworkReply *reply = m_manager->get(request);
-    m_inFlight.insert(key, reply);
-    connect(reply, &QNetworkReply::finished, this, [this, key, reply]() {
-        onReplyFinished(key, reply);
-    });
 }
 
 void NetworkTileProvider::onReplyFinished(uint64_t key, QNetworkReply *reply)

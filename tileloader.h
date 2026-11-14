@@ -2,17 +2,37 @@
 #define TILELOADER_H
 
 #include <QObject>
+#include <QString>
 #include <QJsonDocument>
-#include "tileservermeta.h"
+#include <QSet>
+#include "servermeta.h"
+#include "orm.h"
+#include "network.h"
 
 class TileLoader
-    : public QObject, private TileServerMeta
+    : public QObject, private Network
 {
     Q_OBJECT
 public:
-    TileLoader(QObject *parent = nullptr);
+    explicit TileLoader(const QString &trg, QObject *parent = nullptr);
+    ~TileLoader(void);
+
+    void init(void);
+    void load(void);
+
+signals:
+    void aerodromTilesFailed(int status, QString &msg);
 
 private:
+    QString getReqUrlTarget(const int z, const int x, const int y) override
+    {
+        return QStringLiteral("%1%2/%3/%4/%5")
+        .arg(mapGL::server::k_serv_target,
+             mapGL::server::k_tile_req_postfix,
+             QString::number(z),
+             QString::number(x),
+             QString::number(y));
+    }
     /*
      * Первый запрос на сервер - запрос на список
      * тайлов, которые нужны на аэродром.
@@ -32,6 +52,23 @@ private:
      */
     void fetchAirportTiles(void);
     void parseJsonFetchResponse(const QJsonDocument &doc);
+    void prepare(void);
+
+    QString m_icao;
+    QString m_target;
+    DataBase m_db;
+    bool m_err = false;
+    QString m_lastError;
+
+    double m_lat;
+    double m_lon;
+    int m_minzoom;
+    int m_maxzoom;
+    QString m_mapVersion;
+
+    int m_fetchAttempt = 0;
+
+    QSet<uint64_t> m_tileLoadKeys; // талйлы необходимые для скачивания
 };
 
 #endif // TILELOADER_H

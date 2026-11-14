@@ -14,11 +14,6 @@ const QString errorLogPrefix = QStringLiteral("[MAPGL_ERROR]:");
 inline void debug(const QString msg = QString()) { qDebug() << debugLogPrefix << msg; }
 inline void warning(const QString msg = QString()) { qDebug() << errorLogPrefix << msg; }
 
-// test
-// network
-const QString k_serv_target= QStringLiteral("http://172.20.10.2:8080");
-const QString k_tile_req_postfix = QStringLiteral("/tiles");
-const QString k_tile_fetch_postfix = QStringLiteral("/tiles/piramid");
 // local fallback
 const QString k_fallback_target =
     QStringLiteral("/Users/husen/Documents/test_map/materials/map/world_raster_z0_z6.mbtiles");
@@ -64,6 +59,9 @@ struct TileMeta {
     uint64_t key;
     RawTile rwTile;
 };
+
+// больше для защиты от дурака со стороны сервера
+const int k_maxTileZoom = 15;
 
 enum class DataUnit : uint32_t {
     Byte = 1ULL,

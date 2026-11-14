@@ -9,7 +9,7 @@
  */
 
 #include "tileprovider.h"
-#include "tileservermeta.h";
+#include "network.h"
 #include "mapGL.h"
 
 #include <QHash>
@@ -22,7 +22,7 @@ class QNetworkAccessManager;
 class QNetworkReply;
 
 class NetworkTileProvider
-    : public TileProvider, private TileServerMeta
+    : public TileProvider, private Network
 {
     Q_OBJECT
 public:
@@ -33,14 +33,21 @@ public:
 
     void load(const QVector<uint64_t> &keys, quint64 generation) override;
 
-private:
-    void processQueue(void);
-    void sendRequest(uint64_t key);
-    void onReplyFinished(uint64_t key, QNetworkReply *reply);
+private slots:
+    void onReplyFinished(const uint64_t key, QNetworkReply * reply) override;
 
-    QHash<uint64_t, QNetworkReply *> m_inFlight; // тайлы, которые уже ушли в сеть
-    QSet<uint64_t> m_cancelled; // старые тайлы, которые уже не попадают в экран
-    QSet<uint64_t> m_missing;   // 404 тайлы
+private:
+    QString getReqUrlTarget(const int z, const int x, const int y) override
+    {
+        return QStringLiteral("%1%2/%3/%4/%5")
+            .arg(mapGL::server::k_serv_target,
+            mapGL::server::k_tile_req_postfix,
+            QString::number(z),
+            QString::number(x),
+            QString::number(y));
+    }
+
+    void processQueue(void);
 };
 
 #endif // NETWORKTILEPROVIDER_H
