@@ -9,20 +9,13 @@
  */
 
 #include "tileprovider.h"
-#include "network.h"
+#include "networkservice.h"
 #include "mapGL.h"
 
-#include <QHash>
-#include <QList>
-#include <QSet>
 #include <QString>
-#include <QUrl>
-
-class QNetworkAccessManager;
-class QNetworkReply;
 
 class NetworkTileProvider
-    : public TileProvider, private Network
+    : public TileProvider, private NetworkService
 {
     Q_OBJECT
 public:
@@ -41,10 +34,10 @@ private:
     {
         return QStringLiteral("%1%2/%3/%4/%5")
             .arg(mapGL::server::k_serv_target,
-            mapGL::server::k_tile_req_postfix,
-            QString::number(z),
-            QString::number(x),
-            QString::number(y));
+                 mapGL::server::k_tile_req_postfix,
+                 QString::number(z),
+                 QString::number(x),
+                 QString::number(y));
     }
 
     void processQueue(void);

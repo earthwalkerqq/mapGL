@@ -1,21 +1,24 @@
-#ifndef NETWORK_H
-#define NETWORK_H
+#ifndef NETWORKSERVICE_H
+#define NETWORKSERVICE_H
 
 #include <QObject>
 #include <QUrl>
 #include <QString>
+#include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QHash>
+#include <QList>
 #include <QSet>
 #include "servermeta.h"
 #include "mapGL.h"
 
-class Network
+class NetworkService
 {
 protected:
-    explicit Network(QObject *context = nullptr)
-        : m_context(context), m_manager(new QNetworkAccessManager(context)) {}
+    explicit NetworkService(QObject *context)
+        : m_manager(new QNetworkAccessManager(context)), m_context(context) {}
+    virtual ~NetworkService() = default;
 
     void sendReqForGetTile(uint64_t key)
     {
@@ -38,6 +41,25 @@ protected:
         });
     }
 
+    void cancelReq(uint64_t key)
+    {
+        QNetworkReply *reply = m_inFlight.take(key);
+        if (!reply) {
+            return;
+        }
+        QObject::disconnect(reply, nullptr, m_context, nullptr);
+        reply->abort();
+        reply->deleteLater();
+    }
+
+    void cancelAll(void)
+    {
+        const QList<uint64_t> keys = m_inFlight.keys();
+        for (const uint64_t key : keys) {
+            cancelReq(key);
+        }
+    }
+
     virtual QString getReqUrlTarget(const int z, const int x, const int y) = 0;
     virtual void onReplyFinished(const uint64_t key, QNetworkReply * reply) = 0;
 
@@ -45,11 +67,10 @@ protected:
     QList<uint64_t> m_queue; // очередь тайлов
 
     QHash<uint64_t, QNetworkReply *> m_inFlight; // тайлы, которые уже ушли в сеть
-    QSet<uint64_t> m_cancelled; // старые тайлы, которые уже не попадают в экран
     QSet<uint64_t> m_missing;   // 404 тайлы
 
 private:
     QObject *m_context = nullptr;
 };
 
-#endif // NETWORK_H
+#endif // NETWORKSERVICE_H

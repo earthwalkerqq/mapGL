@@ -73,6 +73,18 @@ public:
         return e && e->tile.quality >= minQuality;
     }
 
+    void removeQuality(mapGL::TileQuality quality)
+    {
+        QMutexLocker locker(&m_mtx);
+        const QList<uint64_t> keys = m_cache.keys();
+        for (const uint64_t key : keys) {
+            const Entry *e = m_cache.object(key);
+            if (e && e->tile.quality == quality) {
+                m_cache.remove(key);
+            }
+        }
+    }
+
 private:
     struct Entry
     {

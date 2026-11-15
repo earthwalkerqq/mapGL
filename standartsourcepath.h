@@ -46,26 +46,33 @@ inline QString writableDir(const QString &sub)
 inline QString localDir(const QString &sub)
 {
 #ifdef MAPGL_AURORA
-    const QString base = Aurora::Application::pathTo(relative).toLocalFile();
-#elif defined(MAPGL_DATA_DIR)
+    const QString base = Aurora::Application::pathTo(sub).toLocalFile();
+    return base;
+#else
+#if defined(MAPGL_DATA_DIR)
     const QString base = QStringLiteral(MAPGL_DATA_DIR);
 #else
     const QString base = QDir(QCoreApplication::applicationDirPath())
         .filePath(QStringLiteral("../share/%1")
         .arg(QFileInfo(QCoreApplication::applicationFilePath()).fileName()));
 #endif
-
-    const QString dir = QDir(base).filePath(sub);
-    if (!QDir().mkpath(dir)) {
-        return QString();
-    }
-    return dir;
+    return QDir(base).filePath(sub);
+#endif
 }
 
-inline QString aeroSourceDir() { return writableDir(QStringLiteral("data/aerodrom.sqlite")); }
-inline QString fallbackTileFile() { return localDir(QStringLiteral("data/map/world_raster_z0_z6.mbtiles")); }
-inline QString aeroDB(const QString icao) { return writableDir(QStringLiteral("aerodroms/%1.mbtiles").arg(icao)); }
-inline QString aeroVector() { return localDir(QStringLiteral("data/aeroports_map")); }
+inline QString writableFile(const QString &dirSub, const QString &fileName)
+{
+    const QString dir = writableDir(dirSub);
+    return dir.isEmpty() ? QString() : QDir(dir).filePath(fileName);
+}
+
+inline QString aeroSourceFile() { return localDir(QStringLiteral("data/aerodrom.sqlite")); }
+inline QString fallbackTileFile() { return localDir(QStringLiteral("map/world_raster_z0_z6.mbtiles")); }
+inline QString aeroDB(const QString &icao)
+{
+    return writableFile(QStringLiteral("aerodroms"), QStringLiteral("%1.mbtiles").arg(icao));
+}
+inline QString aeroVector() { return localDir(QStringLiteral("aeroports_map")); }
 
 } // namespace mapGL
 

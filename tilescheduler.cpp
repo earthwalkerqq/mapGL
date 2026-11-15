@@ -68,6 +68,17 @@ void TileScheduler::removeSource(mapGL::TileQuality quality)
     }
 }
 
+void TileScheduler::removeSource(TileProvider *src)
+{
+    for (int i = m_source.size() - 1; i >= 0; --i) {
+        if (m_source[i].provider == src) {
+            destroySource(m_source[i]);
+            m_source.remove(i);
+            return;
+        }
+    }
+}
+
 void TileScheduler::setVisibleTiles(const QVector<uint64_t> &keys)
 {
     m_visible = keys;

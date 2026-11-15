@@ -11,7 +11,6 @@ find_package(Qt6 REQUIRED COMPONENTS
     Concurrent
     Network
 )
-find_package(Qt6 REQUIRED COMPONENTS Core)
 
 add_library(orm INTERFACE)
 target_include_directories(orm INTERFACE
@@ -44,7 +43,9 @@ qt_add_qml_module(apptest_map
         SOURCES tileloader.h tileloader.cpp
         SOURCES servermeta.h
         SOURCES standartsourcepath.h
-        SOURCES network.h
+        SOURCES networkservice.h
+        SOURCES tilestorage.h tilestorage.cpp
+        SOURCES aerodromtilerasterprovider.h aerodromtilerasterprovider.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -60,8 +61,8 @@ set_target_properties(apptest_map PROPERTIES
 
 # локальная сборка
 target_compile_definitions(apptest_map
-    PRIVATE MAPGL_DATA_DIR="/Users/husen/Documents/test_map"
-    PRIVATE MAPGL_SOURCE_DIR="/Users/husen/Documents/test_map"
+    PRIVATE MAPGL_DATA_DIR="/Users/husen/Documents/test_map/materials"
+    PRIVATE MAPGL_SOURCE_DIR="/Users/husen/Documents/test_map/materials"
 )
 
 # для сборки на деплой
@@ -76,7 +77,6 @@ target_link_libraries(apptest_map
     PRIVATE Qt6::Network
     PRIVATE orm
 )
-target_link_libraries(apptest_map PRIVATE Qt6::Core)
 
 include(GNUInstallDirs)
 install(TARGETS apptest_map

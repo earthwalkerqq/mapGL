@@ -28,6 +28,7 @@ public:
 
     void addSource(TileProvider *src);
     void removeSource(mapGL::TileQuality quality);
+    void removeSource(TileProvider *src);
 
     void setVisibleTiles(const QVector<uint64_t> &keys);
 

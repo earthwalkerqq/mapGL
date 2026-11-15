@@ -14,10 +14,6 @@ const QString errorLogPrefix = QStringLiteral("[MAPGL_ERROR]:");
 inline void debug(const QString msg = QString()) { qDebug() << debugLogPrefix << msg; }
 inline void warning(const QString msg = QString()) { qDebug() << errorLogPrefix << msg; }
 
-// local fallback
-const QString k_fallback_target =
-    QStringLiteral("/Users/husen/Documents/test_map/materials/map/world_raster_z0_z6.mbtiles");
-
 namespace math {
 
 inline void parseKey(uint64_t key, uint8_t* z, uint32_t* x, uint32_t* y)
@@ -39,6 +35,7 @@ enum class TileQuality {
     Fallback = 0, // подложка
     Cached   = 1, // локальный кэш
     Network  = 2, // тайлы с севера
+    Aerodrom = 3, // скаченные тайлы аэродрома
     Custom   = 10 // на будущее (векторные аэродромы и тд)
 };
 
