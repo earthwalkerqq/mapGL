@@ -16,6 +16,8 @@ public:
     QString icao(void) const { return m_icao; }
 
 private:
+    void prepare(void) override;
+
     QString m_icao;
 };
 

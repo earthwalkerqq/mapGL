@@ -46,6 +46,7 @@ qt_add_qml_module(apptest_map
         SOURCES networkservice.h
         SOURCES tilestorage.h tilestorage.cpp
         SOURCES aerodromtilerasterprovider.h aerodromtilerasterprovider.cpp
+        SOURCES aerodromtilevectorprovider.h aerodromtilevectorprovider.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

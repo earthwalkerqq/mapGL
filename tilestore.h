@@ -11,6 +11,9 @@
  * каждая вставка получает новый номер. По нему SGMapView понимает,
  * что под тем же ключом лежит уже другая картинка (пришла лучше качеством),
  * и пересоздаёт текстуру.
+ *
+ * один сторе на все слои нельзя, у раста и вектора могут быть
+ * один и тот же ключ - конфликт
  */
 
 #include "mapGL.h"
@@ -20,6 +23,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 
+template<typename CacheTarget>
 class TileStore
 {
 public:
@@ -38,12 +42,12 @@ public:
             return false;
 
         QMutexLocker locker(&m_mtx);
-        if (const Entry *e = m_cache.object(key)) {
+        if (const CacheTarget *e = m_cache.object(key)) {
             if (e->tile.quality > quality)
                 return false;
         }
-        const qsizetype cost = img.sizeInBytes() + qsizetype(sizeof(Entry));
-        return m_cache.insert(key, new Entry{mapGL::DataTile{img, quality}, m_nextVersion++}, cost);
+        const qsizetype cost = img.sizeInBytes() + qsizetype(sizeof(CacheTarget));
+        return m_cache.insert(key, new CacheTarget{mapGL::DataTile{img, quality}, m_nextVersion++}, cost);
     }
 
     /*
@@ -55,7 +59,7 @@ public:
     bool get(uint64_t key, QImage *img, quint32 *version) const
     {
         QMutexLocker locker(&m_mtx);
-        const Entry *e = m_cache.object(key);
+        const CacheTarget *e = m_cache.object(key);
         if (!e)
             return false;
         if (img)
@@ -69,7 +73,7 @@ public:
     bool has(uint64_t key, mapGL::TileQuality minQuality) const
     {
         QMutexLocker locker(&m_mtx);
-        const Entry *e = m_cache.object(key);
+        const CacheTarget *e = m_cache.object(key);
         return e && e->tile.quality >= minQuality;
     }
 
@@ -78,7 +82,7 @@ public:
         QMutexLocker locker(&m_mtx);
         const QList<uint64_t> keys = m_cache.keys();
         for (const uint64_t key : keys) {
-            const Entry *e = m_cache.object(key);
+            const CacheTarget *e = m_cache.object(key);
             if (e && e->tile.quality == quality) {
                 m_cache.remove(key);
             }
@@ -86,15 +90,30 @@ public:
     }
 
 private:
-    struct Entry
-    {
-        mapGL::DataTile tile;
-        quint32 version;
-    };
-
     mutable QMutex m_mtx;
-    QCache<uint64_t, Entry> m_cache;
+    QCache<uint64_t, CacheTarget> m_cache;
     quint32 m_nextVersion = 1;
+};
+
+struct EntryRaster {
+    mapGL::DataTile tile;
+    quint32 version;
+};
+
+struct EntryVector {
+    QImage img;
+    quint32 version;
+};
+
+class TileStoreRaster : public TileStore<EntryRaster>
+{
+
+};
+
+
+class TileStoreVector : public TileStore<EntryVector>
+{
+
 };
 
 #endif // TILESTORE_H

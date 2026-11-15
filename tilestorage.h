@@ -48,7 +48,7 @@ protected:
     QSet<uint64_t> m_set_miss;
 
 private:
-    void prepare(void);
+    virtual void prepare(void) = 0;
     bool inBounds(uint8_t z, uint32_t x, uint32_t y) const;
 };
 
