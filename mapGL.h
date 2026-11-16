@@ -2,9 +2,12 @@
 #define MAPGL_H
 
 #include <cstdlib>
+#include <memory>
 #include <QString>
 #include <QDebug>
 #include <QImage>
+#include <QRectF>
+#include <QVector>
 
 namespace mapGL {
 
@@ -32,18 +35,29 @@ inline uint64_t makeKey(int z, uint32_t x, uint32_t y)
 } // namespace math
 
 enum class TileQuality {
-    Fallback = 0, // подложка
-    Cached   = 1, // локальный кэш
-    Network  = 2, // тайлы с севера
-    Aerodrom = 3, // скаченные тайлы аэродрома
-    Custom   = 10 // на будущее (векторные аэродромы и тд)
+    Fallback = 0,       // подложка
+    Cached   = 1,       // локальный кэш
+    Network  = 2,       // тайлы с севера
+    Aerodrom = 3,       // скаченные тайлы аэродрома
+    AerodromVector = 4, // векторы аэродромов
+    Custom   = 10       // на будущее (sid, star и тд)
+};
+
+struct AerodromZone {
+    QString icao;
+    QRectF area;
+};
+
+struct VectorFilter {
+    QVector<AerodromZone> zones;
 };
 
 // сырые байты тайла от провайдера — ещё не декодированы
 struct RawTile {
     QByteArray data;
     TileQuality quality;
-    QByteArray format; // имя плагина Qt ("png", "jpg"), см. tileformat.h; пусто — определить по содержимому
+    QByteArray format; // имя плагина Qt
+    std::shared_ptr<const VectorFilter> filter;
 };
 
 // декодированный тайл — лежит в TileStore
@@ -59,6 +73,8 @@ struct TileMeta {
 
 // больше для защиты от дурака со стороны сервера
 const int k_maxTileZoom = 15;
+// у векторных тайлов зум побольше
+const int k_maxTileVectorZoom = 16;
 
 enum class DataUnit : uint32_t {
     Byte = 1ULL,

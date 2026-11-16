@@ -10,7 +10,9 @@ find_package(Qt6 REQUIRED COMPONENTS
     Sql
     Concurrent
     Network
+    Gui
 )
+find_package(ZLIB REQUIRED)
 
 add_library(orm INTERFACE)
 target_include_directories(orm INTERFACE
@@ -38,6 +40,7 @@ qt_add_qml_module(apptest_map
         SOURCES tilestore.h
         SOURCES tileformat.h
         SOURCES tiledecoder.h tiledecoder.cpp
+        SOURCES vectortile.h vectortile.cpp
         SOURCES tilescheduler.h tilescheduler.cpp
         SOURCES tilemanager.h tilemanager.cpp
         SOURCES tileloader.h tileloader.cpp
@@ -76,6 +79,8 @@ target_link_libraries(apptest_map
     PRIVATE Qt6::Core
     PRIVATE Qt6::Concurrent
     PRIVATE Qt6::Network
+    PRIVATE Qt6::Gui
+    PRIVATE ZLIB::ZLIB
     PRIVATE orm
 )
 

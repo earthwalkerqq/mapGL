@@ -67,10 +67,15 @@ protected:
 
     // камера сдвинулась - по умолчанию перерисоваться
     virtual void onCameraChanged() { update(); }
+    virtual int layerCount() const { return 1; }
     // какие тайлы показать; по умолчанию — растровые уровни камеры (z0..kMaxTileZoom)
-    virtual QVector<VisibleTile> tilesToShow() const { return m_camera->visibleTiles(); }
+    virtual QVector<VisibleTile> tilesToShow(int layer) const
+    {
+        Q_UNUSED(layer);
+        return m_camera->visibleTiles();
+    }
     // картинка тайла по ключу; false — её ещё нет.
-    virtual bool tileImage(uint64_t key, QImage *img, quint32 *version) const = 0;
+    virtual bool tileImage(int layer, uint64_t key, QImage *img, quint32 *version) const = 0;
 
     void setBackgroundColor(const QColor &c) { m_background = c; update(); }
     // картинки тайлов поменялись: на следующем кадре удалить все текстуры и создать заново
@@ -83,7 +88,7 @@ private:
      * Сперва пытается найти ключ в кэше, а зетем
      * вызывает tileImage
      */
-    QSGTexture *textureFor(uint64_t key);
+    QSGTexture *textureFor(int layer, uint64_t key);
     // кэш текстур больше лимита — удалить давно не показанные
     void evictTextures();
     // граф сцены пересоздаётся (потеря контекста графики): всё наше уже недействительно
@@ -119,7 +124,7 @@ private:
     static constexpr int kMaxUploadsPerFrame = 8;
 
     // всё ниже — только из потока рендера
-    QHash<uint64_t, CachedTexture> m_textures;
+    QVector<QHash<uint64_t, CachedTexture>> m_textures;
     qint64 m_textureBytes = 0;
     QSGNode *m_tileRoot = nullptr;      // контейнер узлов тайлов
     std::vector<QSGSimpleTextureNode *> m_nodes;

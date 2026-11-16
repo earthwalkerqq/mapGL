@@ -101,19 +101,20 @@ struct EntryRaster {
 };
 
 struct EntryVector {
-    QImage img;
+    mapGL::DataTile tile;
     quint32 version;
 };
 
 class TileStoreRaster : public TileStore<EntryRaster>
 {
-
+public:
+    using TileStore<EntryRaster>::TileStore;
 };
-
 
 class TileStoreVector : public TileStore<EntryVector>
 {
-
+public:
+    using TileStore<EntryVector>::TileStore;
 };
 
 #endif // TILESTORE_H

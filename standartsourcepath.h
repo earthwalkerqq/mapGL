@@ -66,13 +66,13 @@ inline QString writableFile(const QString &dirSub, const QString &fileName)
     return dir.isEmpty() ? QString() : QDir(dir).filePath(fileName);
 }
 
-inline QString aeroSourceFile() { return localDir(QStringLiteral("data/aerodrom.sqlite")); }
+inline QString aeroSourceFile() { return localDir(QStringLiteral("data/Aerodrom_obrazec.sqlite")); }
 inline QString fallbackTileFile() { return localDir(QStringLiteral("map/world_raster_z0_z6.mbtiles")); }
 inline QString aeroDB(const QString &icao)
 {
     return writableFile(QStringLiteral("aerodroms"), QStringLiteral("%1.mbtiles").arg(icao));
 }
-inline QString aeroVector() { return localDir(QStringLiteral("aeroports_map")); }
+inline QString aeroVector() { return localDir(QStringLiteral("aeroports_map/airports_world_z8_z16.mbtiles")); }
 
 } // namespace mapGL
 

@@ -22,13 +22,19 @@ public:
     explicit TileDecoder(QObject *parent = nullptr);
     ~TileDecoder() override;
 
-    void decode(const mapGL::TileMeta &tile);
+    void decodeRaster(const mapGL::TileMeta &tile);
+    void decodeVector(const mapGL::TileMeta &tile);
 
     // потокобезопасно
     static QImage decodeImage(const QByteArray &data, const QByteArray &format);
+    static QImage rasterizeVector(uint64_t key, const QByteArray &data,
+                                  const mapGL::VectorFilter *filter = nullptr);
+
+    static constexpr int k_vectorTileSize = 512;
 
 signals:
-    void decoded(uint64_t key, const QImage &img, mapGL::TileQuality quality);
+    void decodedRaster(uint64_t key, const QImage &img, mapGL::TileQuality quality);
+    void decodedVector(uint64_t key, const QImage &img, mapGL::TileQuality quality);
 
 private:
     QThreadPool m_pool;

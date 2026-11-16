@@ -1,6 +1,7 @@
 #include "tilemanager.h"
 
 #include "aerodromtilerasterprovider.h"
+#include "aerodromtilevectorprovider.h"
 #include "fallbacktileprovider.h"
 #include "networktileprovider.h"
 #include "standartsourcepath.h"
@@ -15,9 +16,10 @@
 TileManager::TileManager(QQuickItem *parent)
     : SGMapView(parent)
     , m_store(static_cast<qsizetype>(mapGL::convertToBytes(30., mapGL::DataUnit::MB)))
-    , m_scheduler(std::make_unique<TileScheduler>(&m_store))
+    , m_storeVec(static_cast<qsizetype>(mapGL::convertToBytes(32., mapGL::DataUnit::MB)))
+    , m_scheduler(std::make_unique<TileScheduler>(&m_store, &m_storeVec))
 {
-    m_scheduler->addSource(new FallbackTileProvider(mapGL::fallbackTileFile()));
+    m_scheduler->addSource(new FallbackTileProvider());
     m_scheduler->addSource(new NetworkTileProvider());
     connect(m_scheduler.get(), &TileScheduler::tilesChanged, this, [this]() { update(); });
 
@@ -62,6 +64,8 @@ bool TileManager::openAerodrom(const QString &icao)
         mapGL::warning(QStringLiteral("некорректный код аэродрома: %1").arg(icao));
         return false;
     }
+    addAerodromVectorSource(code);
+
     if (m_aerodroms.contains(code)) {
         return true;
     }
@@ -106,6 +110,23 @@ bool TileManager::downloadAerodrom(const QString &icao)
     return true;
 }
 
+void TileManager::addAerodromVectorSource(const QString &code)
+{
+    if (m_vectorAerodroms.contains(code)) {
+        return;
+    }
+    m_vectorAerodroms.append(code);
+
+    if (m_vectorProvider) {
+        m_scheduler->removeSource(m_vectorProvider);
+        m_storeVec.removeQuality(mapGL::TileQuality::AerodromVector);
+        invalidateTiles();
+    }
+
+    m_vectorProvider = new AerodromTileVectorProvider(m_vectorAerodroms);
+    m_scheduler->addSource(m_vectorProvider);
+}
+
 void TileManager::addAerodromSource(const QString &icao)
 {
     bool replaced = false;
@@ -116,12 +137,12 @@ void TileManager::addAerodromSource(const QString &icao)
         replaced = true;
     }
 
-    TileProvider *provider = new AerodromTileRasterProvider(icao, mapGL::aeroDB(icao));
+    TileProvider *provider = new AerodromTileRasterProvider(icao);
     m_aerodroms.insert(icao, provider);
     m_scheduler->addSource(provider);
 
     if (replaced && !m_lastKeys.isEmpty()) {
-        m_scheduler->setVisibleTiles(m_lastKeys);
+        m_scheduler->setVisibleTiles(m_lastKeys, m_lastVectorKeys);
     }
 }
 
@@ -139,6 +160,7 @@ void TileManager::releaseLoader(const QString &icao)
 void TileManager::onAerodromTilesReady(const QString &icao)
 {
     releaseLoader(icao);
+    addAerodromVectorSource(icao);
     addAerodromSource(icao);
     emit aerodromReady(icao);
 }
@@ -165,23 +187,42 @@ void TileManager::reloadTiles()
     m_reloadPending = false;
     if (!m_camera) return;
 
+    const QVector<uint64_t> keys = uniqueKeys(tilesToShow(RasterLayer));
+    const QVector<uint64_t> vectorKeys = uniqueKeys(tilesToShow(VectorLayer));
+
+    if (keys == m_lastKeys && vectorKeys == m_lastVectorKeys) return;
+    m_lastKeys = keys;
+    m_lastVectorKeys = vectorKeys;
+
+    m_scheduler->setVisibleTiles(keys, vectorKeys);
+}
+
+QVector<uint64_t> TileManager::uniqueKeys(const QVector<VisibleTile> &tiles)
+{
     QVector<uint64_t> keys;
     QSet<uint64_t> seen;
-    for (const VisibleTile &t : tilesToShow()) {
+    for (const VisibleTile &t : tiles) {
         const uint64_t key = mapGL::math::makeKey(t.z, t.x, t.y);
         if (!seen.contains(key)) {
             seen.insert(key);
             keys.push_back(key);
         }
     }
-
-    if (keys == m_lastKeys) return;
-    m_lastKeys = keys;
-
-    m_scheduler->setVisibleTiles(keys);
+    return keys;
 }
 
-bool TileManager::tileImage(uint64_t key, QImage *img, quint32 *version) const
+QVector<VisibleTile> TileManager::tilesToShow(int layer) const
 {
+    if (layer == VectorLayer) {
+        return m_camera->visibleTiles(k_minVectorZoom, mapGL::k_maxTileVectorZoom);
+    }
+    return m_camera->visibleTiles();
+}
+
+bool TileManager::tileImage(int layer, uint64_t key, QImage *img, quint32 *version) const
+{
+    if (layer == VectorLayer) {
+        return m_storeVec.get(key, img, version);
+    }
     return m_store.get(key, img, version);
 }

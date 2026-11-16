@@ -1,6 +1,11 @@
 #ifndef AERODROMTILERASTERPROVIDER_H
 #define AERODROMTILERASTERPROVIDER_H
 
+/*
+ * класс для отрисовки растовых тайлов аэродромов
+ * скаченных из сети
+ */
+
 #include "tilestorage.h"
 #include "mapGL.h"
 
@@ -10,10 +15,12 @@ class AerodromTileRasterProvider : public TileStorage
 {
     Q_OBJECT
 public:
-    AerodromTileRasterProvider(const QString &icao, const QString &trg, QObject *parent = nullptr);
+    explicit AerodromTileRasterProvider(const QString &icao, QObject *parent = nullptr);
 
     mapGL::TileQuality quality(void) const override { return mapGL::TileQuality::Aerodrom; }
     QString icao(void) const { return m_icao; }
+
+    void load(const QVector<uint64_t> &keys, quint64 generation) override;
 
 private:
     void prepare(void) override;

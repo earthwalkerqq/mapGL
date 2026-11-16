@@ -23,7 +23,7 @@ void NetworkTileProvider::load(const QVector<uint64_t> &keys, quint64 generation
     m_queue.clear();
     for (const uint64_t key : keys) {
         wanted.insert(key);
-        if (m_inFlight.contains(key) || m_missing.contains(key) || alreadyHave(key)) {
+        if (m_inFlight.contains(key) || m_missing.contains(key) || alreadyHaveRaster(key)) {
             continue;
         }
         m_queue.push_back(key);
@@ -46,7 +46,7 @@ void NetworkTileProvider::processQueue()
 {
     while (m_inFlight.size() < mapGL::server::k_max_requested_tile && !m_queue.isEmpty()) {
         const uint64_t key = m_queue.takeFirst();
-        if (m_inFlight.contains(key) || m_missing.contains(key) || alreadyHave(key)) {
+        if (m_inFlight.contains(key) || m_missing.contains(key) || alreadyHaveRaster(key)) {
             continue;
         }
         sendReqForGetTile(key);
@@ -76,7 +76,7 @@ void NetworkTileProvider::onReplyFinished(uint64_t key, QNetworkReply *reply)
         } else {
             const QByteArray format = mapGL::format::fromMimeType(
                 reply->header(QNetworkRequest::ContentTypeHeader).toByteArray());
-            emit readyTile(mapGL::TileMeta{key, mapGL::RawTile{std::move(bytes), quality(), format}});
+            emit readyTileRaster(mapGL::TileMeta{key, mapGL::RawTile{std::move(bytes), quality(), format}});
         }
     }
 

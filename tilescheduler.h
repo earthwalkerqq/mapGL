@@ -20,7 +20,7 @@ class TileScheduler : public QObject
 {
     Q_OBJECT
 public:
-    explicit TileScheduler(TileStore *store, QObject *parent = nullptr);
+    explicit TileScheduler(TileStoreRaster *storeRaster, TileStoreVector *storeVector, QObject *parent = nullptr);
     ~TileScheduler() override;
 
     TileScheduler(const TileScheduler&) = delete;
@@ -30,7 +30,7 @@ public:
     void removeSource(mapGL::TileQuality quality);
     void removeSource(TileProvider *src);
 
-    void setVisibleTiles(const QVector<uint64_t> &keys);
+    void setVisibleTiles(const QVector<uint64_t> &rasterKeys, const QVector<uint64_t> &vectorKeys);
 
 signals:
     // в TileStore появились новые картинки — пора перерисоваться
@@ -43,19 +43,25 @@ private:
         QThread *thread = nullptr; // nullptr — провайдер живёт в главном потоке
     };
 
-    void requestLoad(const Source &src, const QVector<uint64_t> &keys, quint64 generation);
+    void requestLoad(const Source &src, quint64 generation);
     void destroySource(const Source &src);
+    void dropDecoding(mapGL::TileQuality quality, bool vector);
 
-    void onRawTile(const mapGL::TileMeta &tile);
-    void onDecoded(uint64_t key, const QImage &img, mapGL::TileQuality quality);
+    void onRawTileRaster(const mapGL::TileMeta &tile);
+    void onRawTileVector(const mapGL::TileMeta &tile);
+    void onDecodedRaster(uint64_t key, const QImage &img, mapGL::TileQuality quality);
+    void onDecodedVector(uint64_t key, const QImage &img, mapGL::TileQuality quality);
     void onFailedTile(uint64_t key, const QString &msg);
 
-    TileStore *m_store;
+    TileStoreRaster *m_storeRaster;
+    TileStoreVector *m_storeVector;
     TileDecoder m_decoder;
     QVector<Source> m_source;
     // ключи, которые сейчас декодируются, и с каким качеством — чтобы не декодировать дважды
-    QHash<uint64_t, mapGL::TileQuality> m_decoding;
-    QVector<uint64_t> m_visible;
+    QHash<uint64_t, mapGL::TileQuality> m_decodingRaster;
+    QHash<uint64_t, mapGL::TileQuality> m_decodingVector;
+    QVector<uint64_t> m_visibleRaster;
+    QVector<uint64_t> m_visibleVector;
     quint64 m_generation = 0;
 };
 

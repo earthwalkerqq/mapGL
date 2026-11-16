@@ -49,7 +49,8 @@ bool TileLoader::prepare(void)
             return false;
         }
 
-        QPair<Aerodrom, bool> r = aero_db.from<Aerodrom>().select()
+        QPair<Aerodrom, bool> r = aero_db.from<Aerodrom>()
+                                      .select(AerodromFields::long_rad, AerodromFields::lat_rad)
                                       .where(AerodromFields::kod_icao, Comparison::Equal, m_icao).first();
         if (!r.second) {
             fail(0, QStringLiteral("Aerodrom %1 not found").arg(m_icao));

@@ -5,6 +5,7 @@
 #include <QByteArray>
 #include <QSet>
 #include <QString>
+#include <QVector>
 
 #include "tileprovider.h"
 #include "orm.h"
@@ -19,13 +20,19 @@ public:
 
     bool needsOwnThread(void) const override { return true; }
     void init(void) override;
-    void load(const QVector<uint64_t> &keys, quint64 generation) override;
 
     QString target(void) const { return m_target; }
 
 protected:
     TileStorage(const QString &target, int defaultMaxZoom, QObject *parent = nullptr)
         : TileProvider{parent}, m_target(target), m_db(m_target), m_defaultMaxZoom(defaultMaxZoom) {}
+
+    virtual void prepare(void) = 0;
+
+    void readMetadata(void);
+    QVector<uint64_t> storageKeys(const QVector<uint64_t> &keys) const;
+    bool readTile(uint64_t key, QByteArray *data);
+    void setError(const QString &msg);
 
     QString m_target;
     DataBase m_db;
@@ -48,7 +55,6 @@ protected:
     QSet<uint64_t> m_set_miss;
 
 private:
-    virtual void prepare(void) = 0;
     bool inBounds(uint8_t z, uint32_t x, uint32_t y) const;
 };
 

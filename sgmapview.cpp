@@ -7,7 +7,9 @@
 #include <QSGNode>
 #include <QSGSimpleTextureNode>
 #include <QSGTexture>
+#include <algorithm>
 #include <cmath>
+#include <tuple>
 #include <utility>
 
 namespace {
@@ -48,9 +50,11 @@ void SGMapView::itemChange(ItemChange change, const ItemChangeData &value)
 
 void SGMapView::dropTextures()
 {
-    for (const CachedTexture &c : std::as_const(m_textures))
-        delete c.texture;
-    m_textures.clear();
+    for (QHash<uint64_t, CachedTexture> &layer : m_textures) {
+        for (const CachedTexture &c : std::as_const(layer))
+            delete c.texture;
+        layer.clear();
+    }
     m_textureBytes = 0;
 }
 
@@ -66,10 +70,11 @@ void SGMapView::invalidateSceneGraph()
 void SGMapView::releaseResources()
 {
     QList<QSGTexture *> textures;
-    const QHash<uint64_t, CachedTexture> &cached = m_textures;
-    for (const CachedTexture &c : cached)
-        textures.append(c.texture);
-    m_textures.clear();
+    for (QHash<uint64_t, CachedTexture> &layer : m_textures) {
+        for (const CachedTexture &c : std::as_const(layer))
+            textures.append(c.texture);
+        layer.clear();
+    }
     m_textureBytes = 0;
     m_nodes.clear();
     m_tileRoot = nullptr;
@@ -79,14 +84,16 @@ void SGMapView::releaseResources()
                                     QQuickWindow::BeforeSynchronizingStage);
 }
 
-QSGTexture *SGMapView::textureFor(uint64_t key)
+QSGTexture *SGMapView::textureFor(int layer, uint64_t key)
 {
+    QHash<uint64_t, CachedTexture> &textures = m_textures[layer];
+
     quint32 version = 0;
-    const bool inStore = tileImage(key, nullptr, &version);
+    const bool inStore = tileImage(layer, key, nullptr, &version);
     const bool budgetLeft = m_uploadsThisFrame < kMaxUploadsPerFrame;
 
-    const auto it = m_textures.find(key);
-    if (it != m_textures.end()) {
+    const auto it = textures.find(key);
+    if (it != textures.end()) {
         /*
          * Текстура актуальна — отдаём. Если картинку уже вытеснили из ОЗУ
          * (!inStore) — тоже отдаём, что есть. Если пришла новая версия, а
@@ -109,7 +116,7 @@ QSGTexture *SGMapView::textureFor(uint64_t key)
     }
 
     QImage image;
-    if (!tileImage(key, &image, &version) || image.isNull())
+    if (!tileImage(layer, key, &image, &version) || image.isNull())
         return nullptr;
     const QImage *img = &image;
 
@@ -128,7 +135,7 @@ QSGTexture *SGMapView::textureFor(uint64_t key)
     ++m_uploadsThisFrame;
     const qint64 bytes = qint64(img->width()) * img->height() * 4;
 
-    if (it != m_textures.end()) {
+    if (it != textures.end()) {
         /*
          * Старая версия: удаляем сразу. Безопасно — мы в sync-фазе, кадр сейчас
          * не рисуется, а все узлы ниже в этом же кадре получат текстуры заново.
@@ -140,7 +147,7 @@ QSGTexture *SGMapView::textureFor(uint64_t key)
         m_textureBytes -= it->bytes;
         *it = CachedTexture{tex, m_frame, bytes, version};
     } else {
-        m_textures.insert(key, CachedTexture{tex, m_frame, bytes, version});
+        textures.insert(key, CachedTexture{tex, m_frame, bytes, version});
     }
     m_textureBytes += bytes;
     return tex;
@@ -151,19 +158,21 @@ void SGMapView::evictTextures()
     if (m_textureBytes <= kMaxTextureBytes)
         return;
     // кандидаты — не показанные в этом кадре, самые старые первыми
-    std::vector<std::pair<quint64, uint64_t>> old;
-    for (auto it = m_textures.cbegin(); it != m_textures.cend(); ++it) {
-        if (it->lastFrame != m_frame)
-            old.emplace_back(it->lastFrame, it.key());
+    std::vector<std::tuple<quint64, int, uint64_t>> old;
+    for (int layer = 0; layer < m_textures.size(); ++layer) {
+        const QHash<uint64_t, CachedTexture> &textures = m_textures[layer];
+        for (auto it = textures.cbegin(); it != textures.cend(); ++it) {
+            if (it->lastFrame != m_frame)
+                old.emplace_back(it->lastFrame, layer, it.key());
+        }
     }
     std::sort(old.begin(), old.end());
-    for (const auto &o : old) {
+    for (const auto &[lastFrame, layer, key] : old) {
         if (m_textureBytes <= kMaxTextureBytes)
             break;
-        const CachedTexture c = m_textures.value(o.second);
+        const CachedTexture c = m_textures[layer].take(key);
         delete c.texture;
         m_textureBytes -= c.bytes;
-        m_textures.remove(o.second);
     }
 }
 
@@ -212,15 +221,19 @@ QSGNode *SGMapView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
         QRectF source;      // в пикселях текстуры
     };
     std::vector<Piece> pieces;
-    if (m_camera) {
-        for (const VisibleTile &t : tilesToShow()) {
+    const int layers = layerCount();
+    if (m_textures.size() < layers)
+        m_textures.resize(layers);
+
+    for (int layer = 0; m_camera && layer < layers; ++layer) {
+        for (const VisibleTile &t : tilesToShow(layer)) {
             // края по целым пикселям: соседние тайлы стыкуются без щелей
             const double x0 = std::floor(t.screenX), y0 = std::floor(t.screenY);
             const QRectF target(x0, y0, std::floor(t.screenX + t.tileSize) - x0,
                                 std::floor(t.screenY + t.tileSize) - y0);
             for (int up = 0; up <= t.z; ++up) {
                 const uint32_t px = t.x >> up, py = t.y >> up;   // предок на уровне t.z − up
-                QSGTexture *tex = textureFor(mapGL::math::makeKey(t.z - up, px, py));
+                QSGTexture *tex = textureFor(layer, mapGL::math::makeKey(t.z - up, px, py));
                 if (!tex)
                     continue;
                 // предок в 2^up раз крупнее: берём из него квадрат стороной size / 2^up
