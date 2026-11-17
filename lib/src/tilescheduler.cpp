@@ -1,6 +1,8 @@
 #include "tilescheduler.h"
 
+#include <QFutureWatcher>
 #include <QThread>
+#include <QtConcurrent/QtConcurrentRun>
 #include <limits>
 
 TileScheduler::TileScheduler(TileStoreRaster *storeRaster, TileStoreVector *storeVector, QObject *parent)
@@ -209,4 +211,43 @@ void TileScheduler::onFailedTile(uint64_t key, const QString &msg)
     mapGL::math::parseKey(key, &z, &x, &y);
     mapGL::warning(QStringLiteral("Error for key %1:%2:%3 - %4")
         .arg(z).arg(x).arg(y).arg(msg));
+}
+
+namespace {
+
+struct ProcedureResult {
+    bool ok = false;
+    QString error;
+    mapGL::proc::RunwayProcedures schemes;
+};
+
+} // namespace
+
+void TileScheduler::requestProcedures(const QString &icao, const QString &runway)
+{
+    const quint64 request = ++m_procedureRequest;
+
+    auto *watcher = new QFutureWatcher<ProcedureResult>(this);
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, request, icao, runway]() {
+        watcher->deleteLater();
+        if (request != m_procedureRequest)
+            return;
+
+        const ProcedureResult result = watcher->result();
+        if (result.ok)
+            emit proceduresReady(result.schemes);
+        else
+            emit proceduresFailed(icao, runway, result.error);
+    });
+
+    watcher->setFuture(QtConcurrent::run([icao, runway]() {
+        ProcedureResult result;
+        TerminalProcedureBuilder builder(icao, runway);
+        result.ok = builder.load();
+        if (result.ok)
+            result.schemes = builder.build();
+        else
+            result.error = builder.lastError();
+        return result;
+    }));
 }

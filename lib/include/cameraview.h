@@ -62,6 +62,7 @@ public:
      */
     Q_INVOKABLE void panBy(double dx, double dy);
     double getZoom() const { return m_zoom; }
+    double centerWorldX() const { return m_cx; }
     // центр камеры в градусах (обратная проекция Web Mercator)
     double centerLat() const;
     double centerLon() const;

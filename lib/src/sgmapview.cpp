@@ -64,6 +64,7 @@ void SGMapView::invalidateSceneGraph()
     dropTextures();
     m_nodes.clear();
     m_tileRoot = nullptr;
+    m_overlayRoot = nullptr;
     m_backgroundNode = nullptr;
 }
 
@@ -78,6 +79,7 @@ void SGMapView::releaseResources()
     m_textureBytes = 0;
     m_nodes.clear();
     m_tileRoot = nullptr;
+    m_overlayRoot = nullptr;
     m_backgroundNode = nullptr;
     if (!textures.isEmpty() && window())
         window()->scheduleRenderJob(new TextureCleanupJob(std::move(textures)),
@@ -186,6 +188,8 @@ QSGNode *SGMapView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
         m_backgroundNode = nullptr;
         m_tileRoot = new QSGNode();
         root->appendChildNode(m_tileRoot);
+        m_overlayRoot = new QSGNode();
+        root->appendChildNode(m_overlayRoot);
     }
 
     // данные под теми же ключами поменялись — старые текстуры не годятся.
@@ -294,6 +298,8 @@ QSGNode *SGMapView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
      */
     if (m_needMoreUploads)
         QMetaObject::invokeMethod(this, [this]() { update(); }, Qt::QueuedConnection);
+
+    updateOverlay(m_overlayRoot);
 
     return root;
 }

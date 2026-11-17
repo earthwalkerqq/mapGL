@@ -1,0 +1,8 @@
+.*
+!.gitignore
+*.qml
+*.user
+*.autosave
+*.orig
+*.rej
+build*/

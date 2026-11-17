@@ -8,6 +8,7 @@
 #include "sgmapview.h"
 #include "tilestore.h"
 #include "tilescheduler.h"
+#include "terminalprocedurelayer.h"
 
 #include <QHash>
 #include <QString>
@@ -22,8 +23,23 @@ class TileManager : public SGMapView
     Q_OBJECT
     QML_ELEMENT
 public:
+    enum ProcedureKind {
+        Sid = int(mapGL::proc::Kind::Sid),
+        Star = int(mapGL::proc::Kind::Star),
+        Approach = int(mapGL::proc::Kind::Approach)
+    };
+    Q_ENUM(ProcedureKind)
+
     explicit TileManager(QQuickItem *parent = nullptr);
     ~TileManager() override;
+
+    Q_INVOKABLE void loadProcedures(const QString &icao, const QString &runway);
+    Q_INVOKABLE QStringList procedureNames(int kind) const;
+    Q_INVOKABLE QStringList procedureTransitions(int kind, const QString &route) const;
+    Q_INVOKABLE bool showProcedure(int kind, const QString &route,
+                                   const QString &transition = QString());
+    Q_INVOKABLE void hideProcedure(int kind, const QString &route);
+    Q_INVOKABLE void hideAllProcedures(void);
 
     bool openAerodrom(const QString &icao);
     bool downloadAerodrom(const QString &icao);
@@ -33,6 +49,8 @@ public:
 signals:
     void aerodromReady(const QString &icao);
     void aerodromFailed(const QString &icao, const QString &msg);
+    void proceduresReady(const QString &icao, const QString &runway);
+    void proceduresFailed(const QString &icao, const QString &runway, const QString &error);
 
 protected:
     enum Layer {
@@ -45,6 +63,7 @@ protected:
     int layerCount() const override { return LayerCount; }
     QVector<VisibleTile> tilesToShow(int layer) const override;
     bool tileImage(int layer, uint64_t key, QImage *img, quint32 *version) const override;
+    void updateOverlay(QSGNode *overlayRoot) override;
 
 private:
     struct Loader
@@ -63,6 +82,8 @@ private:
     void releaseLoader(const QString &icao);
     static QString normalizeIcao(const QString &icao);
     static QVector<uint64_t> uniqueKeys(const QVector<VisibleTile> &tiles);
+    void onProceduresReady(const mapGL::proc::RunwayProcedures &schemes);
+    static bool validKind(int kind) { return kind >= Sid && kind <= Approach; }
 
     static constexpr int k_minVectorZoom = 8;
 
@@ -79,6 +100,8 @@ private:
     QVector<uint64_t> m_lastKeys;
     QVector<uint64_t> m_lastVectorKeys;
     bool m_reloadPending = false;
+
+    TerminalProcedureLayer m_procedures;
 };
 
 #endif // TILEMANAGER_H

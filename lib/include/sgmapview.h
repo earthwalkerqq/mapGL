@@ -76,6 +76,7 @@ protected:
     }
     // картинка тайла по ключу; false — её ещё нет.
     virtual bool tileImage(int layer, uint64_t key, QImage *img, quint32 *version) const = 0;
+    virtual void updateOverlay(QSGNode *overlayRoot) { Q_UNUSED(overlayRoot); }
 
     void setBackgroundColor(const QColor &c) { m_background = c; update(); }
     // картинки тайлов поменялись: на следующем кадре удалить все текстуры и создать заново
@@ -127,6 +128,7 @@ private:
     QVector<QHash<uint64_t, CachedTexture>> m_textures;
     qint64 m_textureBytes = 0;
     QSGNode *m_tileRoot = nullptr;      // контейнер узлов тайлов
+    QSGNode *m_overlayRoot = nullptr;
     std::vector<QSGSimpleTextureNode *> m_nodes;
     QSGSimpleRectNode *m_backgroundNode = nullptr;
     // текущий кадр, на нем строится lru - самый старый кадр удалиться первым

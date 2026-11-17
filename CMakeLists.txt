@@ -11,6 +11,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Concurrent
     Network
     Gui
+    QuickControls2
 )
 find_package(ZLIB REQUIRED)
 
@@ -31,26 +32,50 @@ qt_add_qml_module(apptest_map
     URI test_map
     QML_FILES
         Main.qml
-        SOURCES sgmapview.h sgmapview.cpp
-        SOURCES cameraview.h cameraview.cpp
-        SOURCES mapGL.h
-        SOURCES tileprovider.h
-        SOURCES networktileprovider.h networktileprovider.cpp
-        SOURCES fallbacktileprovider.h fallbacktileprovider.cpp
-        SOURCES tilestore.h
-        SOURCES tileformat.h
-        SOURCES tiledecoder.h tiledecoder.cpp
-        SOURCES vectortile.h vectortile.cpp
-        SOURCES tilescheduler.h tilescheduler.cpp
-        SOURCES tilemanager.h tilemanager.cpp
-        SOURCES tileloader.h tileloader.cpp
-        SOURCES servermeta.h
-        SOURCES standartsourcepath.h
-        SOURCES networkservice.h
-        SOURCES tilestorage.h tilestorage.cpp
-        SOURCES aerodromtilerasterprovider.h aerodromtilerasterprovider.cpp
-        SOURCES aerodromtilevectorprovider.h aerodromtilevectorprovider.cpp
+    SOURCES
+        mapGL.h
+        mapcontroller.h mapcontroller.cpp
+        lib/include/aerodromtilerasterprovider.h
+        lib/include/aerodromtilevectorprovider.h
+        lib/include/cameraview.h
+        lib/include/fallbacktileprovider.h
+        lib/include/networkservice.h
+        lib/include/networktileprovider.h
+        lib/include/servermeta.h
+        lib/include/sgmapview.h
+        lib/include/standartsourcepath.h
+        lib/include/terminalprocedurebuilder.h
+        lib/include/terminalprocedurelayer.h
+        lib/include/tiledecoder.h
+        lib/include/tileformat.h
+        lib/include/tileloader.h
+        lib/include/tilemanager.h
+        lib/include/tileprovider.h
+        lib/include/tilescheduler.h
+        lib/include/tilestorage.h
+        lib/include/tilestore.h
+        lib/include/vectortile.h
+        lib/src/aerodromtilerasterprovider.cpp
+        lib/src/aerodromtilevectorprovider.cpp
+        lib/src/cameraview.cpp
+        lib/src/fallbacktileprovider.cpp
+        lib/src/networktileprovider.cpp
+        lib/src/sgmapview.cpp
+        lib/src/terminalprocedurebuilder.cpp
+        lib/src/terminalprocedurelayer.cpp
+        lib/src/tiledecoder.cpp
+        lib/src/tileloader.cpp
+        lib/src/tilemanager.cpp
+        lib/src/tilescheduler.cpp
+        lib/src/tilestorage.cpp
+        lib/src/vectortile.cpp
 )
+
+target_include_directories(apptest_map PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/include
+)
+
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
@@ -76,6 +101,7 @@ target_compile_definitions(apptest_map
 
 target_link_libraries(apptest_map
     PRIVATE Qt6::Quick
+    PRIVATE Qt6::QuickControls2
     PRIVATE Qt6::Core
     PRIVATE Qt6::Concurrent
     PRIVATE Qt6::Network

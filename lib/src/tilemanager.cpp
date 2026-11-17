@@ -22,6 +22,8 @@ TileManager::TileManager(QQuickItem *parent)
     m_scheduler->addSource(new FallbackTileProvider());
     m_scheduler->addSource(new NetworkTileProvider());
     connect(m_scheduler.get(), &TileScheduler::tilesChanged, this, [this]() { update(); });
+    connect(m_scheduler.get(), &TileScheduler::proceduresReady, this, &TileManager::onProceduresReady);
+    connect(m_scheduler.get(), &TileScheduler::proceduresFailed, this, &TileManager::proceduresFailed);
 
     setCamera(new CameraView(this));
 }
@@ -225,4 +227,64 @@ bool TileManager::tileImage(int layer, uint64_t key, QImage *img, quint32 *versi
         return m_storeVec.get(key, img, version);
     }
     return m_store.get(key, img, version);
+}
+
+void TileManager::loadProcedures(const QString &icao, const QString &runway)
+{
+    const QString code = normalizeIcao(icao);
+    if (code.isEmpty()) {
+        emit proceduresFailed(icao, runway, QStringLiteral("некорректный код аэродрома: %1").arg(icao));
+        return;
+    }
+    m_scheduler->requestProcedures(code, runway);
+}
+
+void TileManager::onProceduresReady(const mapGL::proc::RunwayProcedures &schemes)
+{
+    m_procedures.setSchemes(schemes);
+    update();
+    emit proceduresReady(schemes.icao, schemes.runway.ident);
+}
+
+QStringList TileManager::procedureNames(int kind) const
+{
+    return validKind(kind) ? m_procedures.names(mapGL::proc::Kind(kind)) : QStringList();
+}
+
+QStringList TileManager::procedureTransitions(int kind, const QString &route) const
+{
+    return validKind(kind) ? m_procedures.transitions(mapGL::proc::Kind(kind), route) : QStringList();
+}
+
+bool TileManager::showProcedure(int kind, const QString &route, const QString &transition)
+{
+    if (!validKind(kind))
+        return false;
+    const bool found = m_procedures.show(mapGL::proc::Kind(kind),
+                                         route.trimmed().toUpper(),
+                                         transition.trimmed().toUpper());
+    update();
+    return found;
+}
+
+void TileManager::hideProcedure(int kind, const QString &route)
+{
+    if (!validKind(kind))
+        return;
+    m_procedures.hide(mapGL::proc::Kind(kind), route.trimmed().toUpper());
+    update();
+}
+
+void TileManager::hideAllProcedures(void)
+{
+    m_procedures.hideAll();
+    update();
+}
+
+void TileManager::updateOverlay(QSGNode *overlayRoot)
+{
+    if (!m_camera)
+        return;
+    m_procedures.updateNodes(overlayRoot, window(), m_camera->worldToScreen(),
+                             m_camera->centerWorldX());
 }

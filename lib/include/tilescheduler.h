@@ -5,6 +5,7 @@
  * Планировщик задач загрузки
  */
 
+#include "terminalprocedurebuilder.h"
 #include "tiledecoder.h"
 #include "tileprovider.h"
 #include "tilestore.h"
@@ -32,9 +33,13 @@ public:
 
     void setVisibleTiles(const QVector<uint64_t> &rasterKeys, const QVector<uint64_t> &vectorKeys);
 
+    void requestProcedures(const QString &icao, const QString &runway);
+
 signals:
     // в TileStore появились новые картинки — пора перерисоваться
     void tilesChanged(void);
+    void proceduresReady(const mapGL::proc::RunwayProcedures &schemes);
+    void proceduresFailed(const QString &icao, const QString &runway, const QString &error);
 
 private:
     struct Source
@@ -63,6 +68,7 @@ private:
     QVector<uint64_t> m_visibleRaster;
     QVector<uint64_t> m_visibleVector;
     quint64 m_generation = 0;
+    quint64 m_procedureRequest = 0;
 };
 
 #endif // TILESCHEDULER_H
