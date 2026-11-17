@@ -16,12 +16,12 @@
 
 static constexpr int k_commitBatch = 256;
 
-TileLoader::TileLoader(const QString &icao, const QString &target, QObject *parent)
+TileLoader::TileLoader(const QString &icao, QObject *parent)
     : QObject{parent}
     , NetworkService(this)
     , m_icao(icao)
-    , m_target(target)
-    , m_partTarget(target + QStringLiteral(".part"))
+    , m_target(mapGL::aeroDB(icao))
+    , m_partTarget(m_target + QStringLiteral(".part"))
     , m_db(m_partTarget) {}
 
 TileLoader::~TileLoader(void)

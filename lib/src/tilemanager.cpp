@@ -93,7 +93,7 @@ bool TileManager::downloadAerodrom(const QString &icao)
     }
 
     Loader l;
-    l.loader = new TileLoader(code, mapGL::aeroDB(code));
+    l.loader = new TileLoader(code);
     l.thread = new QThread;
     l.thread->setObjectName(QStringLiteral("TileLoader-%1").arg(code));
     l.loader->moveToThread(l.thread);
@@ -279,6 +279,13 @@ void TileManager::hideAllProcedures(void)
 {
     m_procedures.hideAll();
     update();
+}
+
+std::optional<TerminalProcedureLayer::FixHit> TileManager::procedureFixAt(const QPointF &pos) const
+{
+    if (!m_camera)
+        return std::nullopt;
+    return m_procedures.fixAt(pos, m_camera->worldToScreen(), m_camera->centerWorldX());
 }
 
 void TileManager::updateOverlay(QSGNode *overlayRoot)

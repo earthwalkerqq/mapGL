@@ -6,6 +6,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <QtMath>
 #include <algorithm>
+#include <cmath>
 
 MapController::MapController(QObject *parent)
     : QObject(parent) {}
@@ -178,6 +179,78 @@ void MapController::showRoute(int kind, const QString &route)
 
     if (m_map->showProcedure(kind, route))
         m_shown[kind] = route;
+}
+
+QVariantMap MapController::fixAt(qreal x, qreal y) const
+{
+    if (!m_map)
+        return {};
+
+    const std::optional<TerminalProcedureLayer::FixHit> hit = m_map->procedureFixAt(QPointF(x, y));
+    if (!hit)
+        return {};
+
+    const mapGL::proc::Fix &f = hit->fix;
+    QVariantList rows;
+    auto row = [&rows](const QString &name, const QString &value) {
+        if (!value.isEmpty())
+            rows.push_back(QVariantMap{{QStringLiteral("name"), name}, {QStringLiteral("value"), value}});
+    };
+
+    static const QStringList kinds = {QStringLiteral("SID"), QStringLiteral("STAR"),
+                                      QStringLiteral("Заход")};
+    QString procedure = kinds.value(int(hit->kind)) + QLatin1Char(' ') + hit->procedure;
+    if (!hit->transition.isEmpty())
+        procedure += QStringLiteral(" (%1)").arg(hit->transition);
+
+    QStringList role;
+    if (f.faf)
+        role << QStringLiteral("FAF");
+    if (f.map)
+        role << QStringLiteral("MAPt");
+    if (f.final)
+        role << QStringLiteral("конечная");
+    role << (f.flyOver ? QStringLiteral("с пролётом") : QStringLiteral("с упреждением"));
+
+    row(QStringLiteral("Схема"), procedure);
+    row(QStringLiteral("Тип"), f.typePoint);
+    row(QStringLiteral("Высота"), altitudeText(f));
+    row(QStringLiteral("Скорость"), f.speedKmh > 0 ? QStringLiteral("≤ %1 км/ч").arg(f.speedKmh) : QString());
+    row(QStringLiteral("Признаки"), role.join(QStringLiteral(", ")));
+    row(QStringLiteral("Широта"), coordinateText(f.pos.lat, true));
+    row(QStringLiteral("Долгота"), coordinateText(f.pos.lon, false));
+
+    return {
+        {QStringLiteral("ident"), f.ident},
+        {QStringLiteral("rows"), rows},
+    };
+}
+
+QString MapController::altitudeText(const mapGL::proc::Fix &f)
+{
+    if (f.h1 <= 0)
+        return QString();
+
+    const QString h1 = QStringLiteral("%1 м").arg(f.h1);
+    if (f.altDesc == QLatin1String("+"))
+        return QStringLiteral("≥ ") + h1;
+    if (f.altDesc == QLatin1String("-"))
+        return QStringLiteral("≤ ") + h1;
+    if (f.altDesc == QLatin1String("B") && f.h2 > 0)
+        return QStringLiteral("%1 – %2 м").arg(qMin(f.h1, f.h2)).arg(qMax(f.h1, f.h2));
+    if (f.h2 > 0 && f.h2 != f.h1)
+        return QStringLiteral("%1 / %2 м").arg(f.h1).arg(f.h2);
+    return h1;
+}
+
+QString MapController::coordinateText(double deg, bool latitude)
+{
+    const QChar hemi = latitude ? (deg < 0. ? QChar(u'S') : QChar(u'N'))
+                                : (deg < 0. ? QChar(u'W') : QChar(u'E'));
+    const double a = std::abs(deg);
+    const int d = int(a);
+    const double m = (a - d) * 60.;
+    return QStringLiteral("%1 %2° %3′").arg(hemi).arg(d).arg(m, 0, 'f', 2);
 }
 
 void MapController::resetProcedures(void)

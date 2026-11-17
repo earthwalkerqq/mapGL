@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QStringList>
+#include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
 class MapController : public QObject
@@ -42,6 +43,7 @@ public:
     Q_INVOKABLE void showSid(const QString &route);
     Q_INVOKABLE void showStar(const QString &route);
     Q_INVOKABLE void showApproach(const QString &route);
+    Q_INVOKABLE QVariantMap fixAt(qreal x, qreal y) const;
 
 signals:
     void mapChanged(void);
@@ -61,6 +63,8 @@ private:
     };
 
     static AerodromeInfo readAerodrome(const QString &icao);
+    static QString altitudeText(const mapGL::proc::Fix &fix);
+    static QString coordinateText(double deg, bool latitude);
 
     void onAerodromeRead(const AerodromeInfo &info);
     void onProceduresReady(const QString &icao, const QString &runway);

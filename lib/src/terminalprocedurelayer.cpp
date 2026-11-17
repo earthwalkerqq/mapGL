@@ -135,7 +135,7 @@ void TerminalProcedureLayer::setSchemes(const mapGL::proc::RunwayProcedures &sch
                 d.legs.push_back(std::move(l));
             }
             for (const mapGL::proc::Fix &f : p.fixes)
-                d.fixes.push_back({toWorld(f.pos), f.ident, f.final});
+                d.fixes.push_back({toWorld(f.pos), f});
 
             m_procedures.push_back(std::move(d));
         }
@@ -214,6 +214,28 @@ bool TerminalProcedureLayer::hasVisible(void) const
     return false;
 }
 
+std::optional<TerminalProcedureLayer::FixHit>
+TerminalProcedureLayer::fixAt(const QPointF &screen, const QTransform &worldToScreen,
+                              double centerWorldX) const
+{
+    std::optional<FixHit> hit;
+    double best = k_fixHitRadius;
+    for (const DrawProcedure &p : m_procedures) {
+        if (!p.visible)
+            continue;
+        for (const DrawFix &f : p.fixes) {
+            const double shift = std::round(centerWorldX - f.world.x());
+            const QPointF c = worldToScreen.map(f.world + QPointF(shift, 0.));
+            const double d = std::hypot(c.x() - screen.x(), c.y() - screen.y());
+            if (d > best)
+                continue;
+            best = d;
+            hit = FixHit{f.fix, p.kind, p.name, p.transition};
+        }
+    }
+    return hit;
+}
+
 QPointF TerminalProcedureLayer::toWorld(const mapGL::proc::GeoPoint &g)
 {
     const double phi = qDegreesToRadians(g.lat);
@@ -256,7 +278,7 @@ void TerminalProcedureLayer::appendProcedure(const DrawProcedure &p, const QTran
 
     for (const DrawFix &f : p.fixes) {
         const QPointF c = project(f.world);
-        if (f.final) {
+        if (f.fix.final) {
             addUpTriangle(fill, c, k_fixSize * 2.);
             continue;
         }
@@ -279,13 +301,13 @@ void TerminalProcedureLayer::rebuildLabels(void)
         if (!p.visible)
             continue;
         for (const DrawFix &f : p.fixes) {
-            const QString key = QStringLiteral("%1|%2|%3").arg(f.ident).arg(f.world.x(), 0, 'g', 12)
+            const QString key = QStringLiteral("%1|%2|%3").arg(f.fix.ident).arg(f.world.x(), 0, 'g', 12)
                                     .arg(f.world.y(), 0, 'g', 12);
-            if (f.ident.isEmpty() || seen.contains(key))
+            if (f.fix.ident.isEmpty() || seen.contains(key))
                 continue;
             seen.insert(key);
 
-            auto layout = std::make_shared<QTextLayout>(f.ident, font);
+            auto layout = std::make_shared<QTextLayout>(f.fix.ident, font);
             layout->beginLayout();
             QTextLine line = layout->createLine();
             line.setLineWidth(1000.);
@@ -327,7 +349,7 @@ void TerminalProcedureLayer::updateLabels(QQuickWindow *window, const QTransform
         const double height = label.layout->boundingRect().height();
 
         QMatrix4x4 m;
-        m.translate(float(s.x() + k_fixSize + k_labelGap), float(s.y() - height / 2.));
+        m.translate(float(s.x() + k_labelOffsetX), float(s.y() - k_labelOffsetY - height / 2.));
         static_cast<QSGTransformNode *>(child)->setMatrix(m);
         child = child->nextSibling();
     }

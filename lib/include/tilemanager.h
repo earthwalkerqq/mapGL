@@ -41,6 +41,8 @@ public:
     Q_INVOKABLE void hideProcedure(int kind, const QString &route);
     Q_INVOKABLE void hideAllProcedures(void);
 
+    std::optional<TerminalProcedureLayer::FixHit> procedureFixAt(const QPointF &pos) const;
+
     bool openAerodrom(const QString &icao);
     bool downloadAerodrom(const QString &icao);
     bool isAerodromOpened(const QString &icao) const;

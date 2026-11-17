@@ -17,7 +17,7 @@ class TileLoader
 {
     Q_OBJECT
 public:
-    TileLoader(const QString &icao, const QString &target, QObject *parent = nullptr);
+    TileLoader(const QString &icao, QObject *parent = nullptr);
     ~TileLoader(void) override;
 
     void init(void);

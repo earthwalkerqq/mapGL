@@ -10,6 +10,7 @@
 #include <QTransform>
 #include <QVector>
 #include <memory>
+#include <optional>
 
 class QQuickWindow;
 class QSGGeometryNode;
@@ -19,6 +20,13 @@ class TerminalProcedureLayer
 {
 public:
     using Kind = mapGL::proc::Kind;
+
+    struct FixHit {
+        mapGL::proc::Fix fix;
+        Kind kind = Kind::Sid;
+        QString procedure;
+        QString transition;
+    };
 
     void setSchemes(const mapGL::proc::RunwayProcedures &schemes);
     void clear(void);
@@ -35,6 +43,9 @@ public:
     void hideAll(void);
     bool hasVisible(void) const;
 
+    std::optional<FixHit> fixAt(const QPointF &screen, const QTransform &worldToScreen,
+                                double centerWorldX) const;
+
     void updateNodes(QSGNode *parent, QQuickWindow *window, const QTransform &worldToScreen,
                      double centerWorldX);
 
@@ -49,8 +60,7 @@ private:
 
     struct DrawFix {
         QPointF world;
-        QString ident;
-        bool final = false;
+        mapGL::proc::Fix fix;
     };
 
     struct Label {
@@ -85,14 +95,16 @@ private:
 
     static QPointF toWorld(const mapGL::proc::GeoPoint &g);
 
-    static constexpr double k_lineWidth = 2.5;
+    static constexpr double k_lineWidth = 4.0;
     static constexpr double k_runwayWidth = 6.0;
     static constexpr double k_arrowSize = 5.5;
     static constexpr double k_arrowSpacing = 160.0;
-    static constexpr double k_fixSize = 7.0;
-    static constexpr double k_fixBorder = 1.8;
-    static constexpr int k_labelPixelSize = 12;
-    static constexpr double k_labelGap = 4.0;
+    static constexpr double k_fixSize = 9.0;
+    static constexpr double k_fixBorder = 2.5;
+    static constexpr double k_fixHitRadius = 16.0;
+    static constexpr int k_labelPixelSize = 18;
+    static constexpr double k_labelOffsetX = 14.0;
+    static constexpr double k_labelOffsetY = 6.0;
 
     QString m_icao;
     QString m_runway;
